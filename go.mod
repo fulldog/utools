@@ -1,4 +1,4 @@
-module utools
+module github.com/fulldog/utools
 
 go 1.19
 
