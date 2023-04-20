@@ -3,7 +3,6 @@ package diyTypes
 import (
 	"fmt"
 	"github.com/fulldog/utools/timex"
-	jsoniter "github.com/json-iterator/go"
 	"github.com/pkg/errors"
 	"regexp"
 	"strconv"
@@ -15,12 +14,15 @@ type DiyTime struct {
 	time.Time
 	Layout string
 }
+type UnixTime struct {
+	time.Time
+	Layout string
+}
 
 // DonetTime 解析.net的时间 Date\((\d+)-\d+\)
 type DonetTime time.Time
 
 // UnixTime 解析时间戳
-type UnixTime time.Time
 
 func (t *DiyTime) MarshalJSON() ([]byte, error) {
 	var stamp string
@@ -35,18 +37,14 @@ func (t *DiyTime) UnmarshalJSON(data []byte) error {
 	//先尝试正常转
 	err := t.Time.UnmarshalJSON(data)
 	if err != nil {
-		s := string(data)
-		t.Time, err = time.Parse(timex.DateTime, s)
-		t.Layout = timex.DateTime
-		if err != nil {
-			t.Layout = timex.DateOnly
-			t.Time, err = time.Parse(timex.DateOnly, s)
+		for _, format := range []string{timex.DateOnly, timex.DateTime} {
+			if t.Time, err = time.Parse(`"`+format+`"`, string(data)); err == nil {
+				t.Layout = format
+				return nil
+			}
 		}
 	}
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // ToYmdHis 格式化
@@ -96,12 +94,18 @@ func (dt *UnixTime) UnmarshalJSON(data []byte) error {
 		return errors.New("时间格式错误" + string(data))
 	}
 	// 将时间戳转换为 time.Time 对象
-	*dt = UnixTime(time.Unix(timestamp/1000, 0).In(timex.TimeZone))
+	dt.Time = time.Unix(timestamp, 0).In(timex.TimeZone)
 	return nil
 }
 func (dt *UnixTime) ToTime() time.Time {
-	return time.Time(*dt)
+	return dt.Time
 }
 func (dt *UnixTime) MarshalJSON() ([]byte, error) {
-	return jsoniter.Marshal(dt.ToTime().Unix())
+	var stamp string
+	if dt.Layout == "" {
+		stamp = fmt.Sprintf("\"%s\"", dt.Time.String())
+	} else {
+		stamp = fmt.Sprintf("\"%s\"", dt.Time.Format(dt.Layout))
+	}
+	return []byte(stamp), nil
 }
