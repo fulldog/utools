@@ -1,0 +1,180 @@
+package utools
+
+import (
+	"fmt"
+	"github.com/bwmarrin/snowflake"
+	"github.com/fulldog/utools/timex"
+	"github.com/pkg/errors"
+	"github.com/xuri/excelize/v2"
+	"os"
+	"reflect"
+	"strconv"
+	"strings"
+	"time"
+)
+
+var ExcelTool = &excelTool{}
+
+type excelTool struct{}
+
+type ExportModel struct {
+	ExcelType   int
+	FileName    string
+	ObjDatas    []*ObjData //[]sheet1,sheet2
+	ShowExtFlag int
+}
+type ObjData struct {
+	SheetName string
+	Data      []interface{}
+	Header    []interface{}
+}
+
+const fileExt = ".xlsx"
+
+func (e excelTool) SpecialFileName(s string) string {
+	for _, v := range []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|", "%", "+"} {
+		s = strings.ReplaceAll(s, v, "")
+	}
+	return s
+}
+
+// CreateExcel 生成Excel
+// m.ObjData 是一个二维数组，每个数组表示一个sheet
+func (e excelTool) CreateExcel(m ExportModel) (fileRoute string, err error) {
+	if m.ObjDatas == nil {
+		err = errors.New("数据不能为空")
+		return
+	}
+
+	fileNameOrg := e.SpecialFileName(m.FileName)
+	node, _ := snowflake.NewNode(16)
+	fileName := fmt.Sprintf("%s_%s%s", fileNameOrg, node.Generate().String(), fileExt)
+	filePath := e.GetFilePath()
+	//filePathUrl := strings.ReplaceAll(filePath, "\\", pathRoute)
+	//relativeUrl := fmt.Sprint(filePathUrl, pathRoute, fileName)
+	//fileSize := 0
+
+	//生成文件路径
+	path := fmt.Sprint(pathRoute, filePath)
+	err = e.CreateDir(path)
+	if err != nil {
+		return
+	}
+	excel := excelize.NewFile()
+	styleFloat64, _ := excel.NewStyle(&excelize.Style{
+		NumFmt: 2,
+	})
+	defer func() {
+		if err := excel.Close(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+	var deleteSheet1 bool
+	var streamWriter *excelize.StreamWriter
+	for obi, _ := range m.ObjDatas {
+		if m.ObjDatas[obi] == nil {
+			continue
+		}
+		sheet := TernaryOperation(m.ObjDatas[obi].SheetName == "", "Sheet"+strconv.Itoa(obi+1), m.ObjDatas[obi].SheetName)
+		_, err = excel.NewSheet(sheet)
+		if err != nil {
+			return
+		}
+		if deleteSheet1 == false && sheet == "Sheet1" {
+			deleteSheet1 = true
+		}
+		streamWriter, err = excel.NewStreamWriter(sheet)
+		if err != nil {
+			return
+		}
+		desc := reflect.TypeOf(m.ObjDatas[obi].Data[0]).Elem()
+		var numField = desc.NumField()
+		if m.ObjDatas[obi].Header == nil {
+			for j := 0; j < numField; j++ {
+				de := desc.Field(j).Tag.Get("desc")
+				if de == "" || de == "-" {
+					continue
+				}
+				m.ObjDatas[obi].Header = append(m.ObjDatas[obi].Header, de)
+			}
+		}
+
+		err = streamWriter.SetRow("A1", m.ObjDatas[obi].Header)
+		if err != nil || len(m.ObjDatas[obi].Header) == 0 {
+			err = errors.WithMessagef(err, "创建表头错误")
+			return
+		}
+
+		i := 2
+		for _, d := range m.ObjDatas[obi].Data {
+			ref := reflect.ValueOf(d).Elem()
+			var dt []interface{}
+			for k := 0; k < numField; k++ {
+				de := desc.Field(k).Tag.Get("desc")
+				if de == "" || de == "-" {
+					continue
+				}
+				switch ref.Field(k).Type().String() {
+				case "int", "int8", "int64", "float32", "float64":
+					dt = append(dt, excelize.Cell{
+						StyleID: styleFloat64,
+						Formula: "",
+						Value:   ref.Field(k).Float(),
+					})
+					//fmt.Println(btype.ToString(ref.Field(k).Float()))
+				default:
+					dt = append(dt, excelize.Cell{
+						StyleID: styleFloat64,
+						Formula: "",
+						Value:   ref.Field(k).String(),
+					})
+				}
+			}
+			err = streamWriter.SetRow("A"+strconv.Itoa(i), dt)
+			if err != nil {
+				err = errors.WithMessagef(err, fmt.Sprintf("创建数据错误错误:%s,A%d", sheet, i))
+				return
+			}
+			i++
+		}
+		err = streamWriter.Flush()
+		if err != nil {
+			err = errors.WithMessagef(err, "写入文件错误")
+			return
+		}
+	}
+	if !deleteSheet1 {
+		_ = excel.DeleteSheet("Sheet1")
+	}
+	savePath := fmt.Sprint(filePath, pathRoute, fileName)
+	err = excel.SaveAs(savePath)
+	if err != nil {
+		err = errors.WithMessagef(err, "生成文件错误")
+		return
+	}
+	fileRoute = fmt.Sprint(strings.TrimLeft(savePath, "."))
+	return
+}
+
+func (e excelTool) GetFilePath() string {
+	t := time.Now()
+	return fmt.Sprint(t.Format(timex.DateYearMonth), pathRoute, "xlsx")
+}
+
+func (e excelTool) CreateDir(s string) (err error) {
+	if b, _ := e.PathExists(s); !b {
+		err = os.MkdirAll(s, os.ModePerm)
+	}
+	return
+}
+
+func (e excelTool) PathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
