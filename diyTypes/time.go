@@ -34,6 +34,9 @@ func (t *DiyTime) MarshalJSON() ([]byte, error) {
 	return []byte(stamp), nil
 }
 func (t *DiyTime) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
 	//先尝试正常转
 	err := t.Time.UnmarshalJSON(data)
 	if err != nil {
@@ -62,6 +65,9 @@ func (t *DiyTime) ToString() string {
 }
 
 func (dt *DonetTime) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
 	//先尝试正常转
 	var t time.Time
 	err := t.UnmarshalJSON(data)
@@ -89,6 +95,9 @@ func (dt *DonetTime) ToTime() time.Time {
 }
 
 func (dt *UnixTime) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
 	timestamp, err := strconv.ParseInt(string(data), 10, 64)
 	if err != nil {
 		return errors.New("时间格式错误" + string(data))
