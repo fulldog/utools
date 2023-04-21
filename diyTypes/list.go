@@ -1,20 +1,38 @@
 package diyTypes
 
-import "github.com/pkg/errors"
+import (
+	"github.com/pkg/errors"
+)
 
 var errNotFound error = errors.New("not found")
 
-// distinct 非并发安全
-type distinctList[T ~int | ~string] struct {
+// DistinctList 非并发安全
+type DistinctList[T comparable] struct {
 	arr         []T
-	distinctMap map[T]struct{}
 	arrDist     []T
-	//lock        sync.Mutex
+	distinctMap map[T]struct{}
 }
 
 // DiyListAny 任意类型的list
 type DiyListAny[T any] []T
 
+// SumFloat64 统计浮点数
+func (lst DiyListAny[T]) SumFloat64(fn func(x T) float64) (f float64) {
+	for i := 0; i < len(lst); i++ {
+		f += fn(lst[i])
+	}
+	return f
+}
+
+// SumInt 统计整数
+func (lst DiyListAny[T]) SumInt(fn func(x T) int) (f int) {
+	for i := 0; i < len(lst); i++ {
+		f += fn(lst[i])
+	}
+	return f
+}
+
+// FindOne 查询一个
 func (lst DiyListAny[T]) FindOne(fn func(x T) bool) (xy T, err error) {
 	for i := 0; i < len(lst); i++ {
 		if fn(lst[i]) {
@@ -25,6 +43,8 @@ func (lst DiyListAny[T]) FindOne(fn func(x T) bool) (xy T, err error) {
 	err = errNotFound
 	return
 }
+
+// FindAny 查找任意值
 func (lst DiyListAny[T]) FindAny(fn func(x T) (any, bool)) (any, bool) {
 	for i := 0; i < len(lst); i++ {
 		if x, y := fn(lst[i]); y {
@@ -33,6 +53,8 @@ func (lst DiyListAny[T]) FindAny(fn func(x T) (any, bool)) (any, bool) {
 	}
 	return nil, false
 }
+
+// HasOne 是否含有元素
 func (lst DiyListAny[T]) HasOne(fn func(x T) bool) bool {
 	for i := 0; i < len(lst); i++ {
 		if fn(lst[i]) {
@@ -42,6 +64,7 @@ func (lst DiyListAny[T]) HasOne(fn func(x T) bool) bool {
 	return false
 }
 
+// FindList 返回查询的集合
 func (lst DiyListAny[T]) FindList(fn func(x T) bool) []T {
 	var rt = make([]T, len(lst))
 	for i := 0; i < len(lst); i++ {
@@ -110,35 +133,30 @@ func (lst DiyListAny[T]) Slice(st, et uint) []T {
 	return lst[st:et]
 }
 
-func NewDistinctList[T ~int | ~string]() *distinctList[T] {
-	return &distinctList[T]{}
-}
-func (l *distinctList[T]) distinct(x T) {
-	//l.lock.Lock()
-	//defer l.lock.Unlock()
+func (l *DistinctList[T]) distinct(x T) {
 	if l.distinctMap == nil {
 		l.distinctMap = make(map[T]struct{}, 10)
 	}
 	l.distinctMap[x] = struct{}{}
 }
-func (l *distinctList[T]) Adds(x []T) *distinctList[T] {
+func (l *DistinctList[T]) Adds(x []T) *DistinctList[T] {
 	for _, t := range x {
 		l.Add(t)
 	}
 	return l
 }
-func (l *distinctList[T]) Add(x T) *distinctList[T] {
+func (l *DistinctList[T]) Add(x T) *DistinctList[T] {
 	l.distinct(x)
 	l.arr = append(l.arr, x)
 	l.arrDist = nil
 	return l
 }
 
-func (l *distinctList[T]) Len() int {
+func (l *DistinctList[T]) Len() int {
 	return len(l.arr)
 }
 
-func (l *distinctList[T]) Distinct() []T {
+func (l *DistinctList[T]) Distinct() []T {
 	if l.arrDist != nil {
 		return l.arrDist
 	}
@@ -151,7 +169,7 @@ func (l *distinctList[T]) Distinct() []T {
 	return nil
 }
 
-func (l *distinctList[T]) ReValue(x []T) *distinctList[T] {
+func (l *DistinctList[T]) ReValue(x []T) *DistinctList[T] {
 	l.arr = nil
 	l.distinctMap = nil
 	l.Adds(x)
@@ -159,7 +177,7 @@ func (l *distinctList[T]) ReValue(x []T) *distinctList[T] {
 }
 
 // Except 排除arr元素
-func (l *distinctList[T]) Except(arr []T) *distinctList[T] {
+func (l *DistinctList[T]) Except(arr []T) *DistinctList[T] {
 	for _, t := range arr {
 		if _, ok := l.distinctMap[t]; ok {
 			delete(l.distinctMap, t)
@@ -172,6 +190,6 @@ func (l *distinctList[T]) Except(arr []T) *distinctList[T] {
 	return l
 }
 
-func (l *distinctList[T]) ToList() []T {
+func (l *DistinctList[T]) ToList() []T {
 	return l.arr
 }

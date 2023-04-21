@@ -13,23 +13,23 @@ import (
 	"time"
 )
 
-var ExcelTool = &excelTool{}
+const fileExt = ".xlsx"
 
 type excelTool struct{}
+
+var ExcelTool = &excelTool{}
 
 type ExportModel struct {
 	ExcelType   int
 	FileName    string
-	ObjDatas    []*ObjData //[]sheet1,sheet2
 	ShowExtFlag int
+	ObjDatas    []*ObjData //[]sheet1,sheet2
 }
 type ObjData struct {
 	SheetName string
 	Data      []interface{}
 	Header    []interface{}
 }
-
-const fileExt = ".xlsx"
 
 func (e excelTool) SpecialFileName(s string) string {
 	for _, v := range []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|", "%", "+"} {
