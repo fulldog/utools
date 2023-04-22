@@ -1,4 +1,4 @@
-package ecb
+package utools
 
 import "crypto/cipher"
 
@@ -14,15 +14,15 @@ func newECB(b cipher.Block) *ecb {
 	}
 }
 
-type ecbEncrypter ecb
+type ecbEncrypt ecb
 
-// NewECBEncrypter returns a BlockMode which encrypts in electronic code book
+// NewECBEncrypted returns a BlockMode which encrypts in electronic code book
 // mode, using the given Block.
-func NewECBEncrypter(b cipher.Block) cipher.BlockMode {
-	return (*ecbEncrypter)(newECB(b))
+func NewECBEncrypted(b cipher.Block) cipher.BlockMode {
+	return (*ecbEncrypt)(newECB(b))
 }
-func (x *ecbEncrypter) BlockSize() int { return x.blockSize }
-func (x *ecbEncrypter) CryptBlocks(dst, src []byte) {
+func (x *ecbEncrypt) BlockSize() int { return x.blockSize }
+func (x *ecbEncrypt) CryptBlocks(dst, src []byte) {
 	if len(src)%x.blockSize != 0 {
 		panic("crypto/cipher: input not full blocks")
 	}
@@ -36,15 +36,15 @@ func (x *ecbEncrypter) CryptBlocks(dst, src []byte) {
 	}
 }
 
-type ecbDecrypter ecb
+type ecbDecrypt ecb
 
-// NewECBDecrypter returns a BlockMode which decrypts in electronic code book
+// NewECBDecrypted returns a BlockMode which decrypts in electronic code book
 // mode, using the given Block.
-func NewECBDecrypter(b cipher.Block) cipher.BlockMode {
-	return (*ecbDecrypter)(newECB(b))
+func NewECBDecrypted(b cipher.Block) cipher.BlockMode {
+	return (*ecbDecrypt)(newECB(b))
 }
-func (x *ecbDecrypter) BlockSize() int { return x.blockSize }
-func (x *ecbDecrypter) CryptBlocks(dst, src []byte) {
+func (x *ecbDecrypt) BlockSize() int { return x.blockSize }
+func (x *ecbDecrypt) CryptBlocks(dst, src []byte) {
 	if len(src)%x.blockSize != 0 {
 		panic("crypto/cipher: input not full blocks")
 	}
