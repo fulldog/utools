@@ -39,7 +39,7 @@ func ShuffleString[T any](slice []T) {
 	}
 }
 
-func ArrayKeys[T comparable](m map[T]interface{}) []T {
+func ArrayKeys[T comparable](m map[T]any) []T {
 	arr := make([]T, 0, len(m))
 	for i, _ := range m {
 		arr = append(arr, i)

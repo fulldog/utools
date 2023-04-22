@@ -20,6 +20,7 @@ type excelTool struct{}
 var ExcelTool = &excelTool{}
 
 type ExportModel struct {
+	Path        string
 	ExcelType   int
 	FileName    string
 	ShowExtFlag int
@@ -49,14 +50,13 @@ func (e excelTool) CreateExcel(m ExportModel) (fileRoute string, err error) {
 	fileNameOrg := e.SpecialFileName(m.FileName)
 	node, _ := snowflake.NewNode(16)
 	fileName := fmt.Sprintf("%s_%s%s", fileNameOrg, node.Generate().String(), fileExt)
-	filePath := e.GetFilePath()
+	filePath := e.GetFilePath(m.Path)
 	//filePathUrl := strings.ReplaceAll(filePath, "\\", pathRoute)
 	//relativeUrl := fmt.Sprint(filePathUrl, pathRoute, fileName)
 	//fileSize := 0
 
 	//生成文件路径
-	path := fmt.Sprint(pathRoute, filePath)
-	err = e.CreateDir(path)
+	err = e.CreateDir(filePath)
 	if err != nil {
 		return
 	}
@@ -146,7 +146,7 @@ func (e excelTool) CreateExcel(m ExportModel) (fileRoute string, err error) {
 	if !deleteSheet1 {
 		_ = excel.DeleteSheet("Sheet1")
 	}
-	savePath := fmt.Sprint(filePath, pathRoute, fileName)
+	savePath := fmt.Sprint(filePath, fileName)
 	err = excel.SaveAs(savePath)
 	if err != nil {
 		err = errors.WithMessagef(err, "生成文件错误")
@@ -156,9 +156,8 @@ func (e excelTool) CreateExcel(m ExportModel) (fileRoute string, err error) {
 	return
 }
 
-func (e excelTool) GetFilePath() string {
-	t := time.Now()
-	return fmt.Sprint(t.Format(timex.DateYearMonth), pathRoute, "xlsx")
+func (e excelTool) GetFilePath(path string) string {
+	return fmt.Sprint(time.Now().Format(timex.DateYearMonth), path, "xlsx")
 }
 
 func (e excelTool) CreateDir(s string) (err error) {
