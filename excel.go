@@ -24,9 +24,9 @@ type ExportModel struct {
 	ExcelType   int
 	FileName    string
 	ShowExtFlag int
-	ObjDatas    []*ObjData //[]sheet1,sheet2
+	SheetDatas  []*SheetData //[]sheet1,sheet2
 }
-type ObjData struct {
+type SheetData struct {
 	SheetName string
 	Data      []interface{}
 	Header    []interface{}
@@ -42,7 +42,7 @@ func (e excelTool) SpecialFileName(s string) string {
 // CreateExcel 生成Excel
 // m.ObjData 是一个二维数组，每个数组表示一个sheet
 func (e excelTool) CreateExcel(m ExportModel) (fileRoute string, err error) {
-	if m.ObjDatas == nil {
+	if m.SheetDatas == nil {
 		err = errors.New("数据不能为空")
 		return
 	}
@@ -71,11 +71,11 @@ func (e excelTool) CreateExcel(m ExportModel) (fileRoute string, err error) {
 	}()
 	var deleteSheet1 bool
 	var streamWriter *excelize.StreamWriter
-	for obi, _ := range m.ObjDatas {
-		if m.ObjDatas[obi] == nil {
+	for obi, _ := range m.SheetDatas {
+		if m.SheetDatas[obi] == nil {
 			continue
 		}
-		sheet := TernaryOperation(m.ObjDatas[obi].SheetName == "", "Sheet"+strconv.Itoa(obi+1), m.ObjDatas[obi].SheetName)
+		sheet := TernaryOperation(m.SheetDatas[obi].SheetName == "", "Sheet"+strconv.Itoa(obi+1), m.SheetDatas[obi].SheetName)
 		_, err = excel.NewSheet(sheet)
 		if err != nil {
 			return
@@ -87,26 +87,26 @@ func (e excelTool) CreateExcel(m ExportModel) (fileRoute string, err error) {
 		if err != nil {
 			return
 		}
-		desc := reflect.TypeOf(m.ObjDatas[obi].Data[0]).Elem()
+		desc := reflect.TypeOf(m.SheetDatas[obi].Data[0]).Elem()
 		var numField = desc.NumField()
-		if m.ObjDatas[obi].Header == nil {
+		if m.SheetDatas[obi].Header == nil {
 			for j := 0; j < numField; j++ {
 				de := desc.Field(j).Tag.Get("desc")
 				if de == "" || de == "-" {
 					continue
 				}
-				m.ObjDatas[obi].Header = append(m.ObjDatas[obi].Header, de)
+				m.SheetDatas[obi].Header = append(m.SheetDatas[obi].Header, de)
 			}
 		}
 
-		err = streamWriter.SetRow("A1", m.ObjDatas[obi].Header)
-		if err != nil || len(m.ObjDatas[obi].Header) == 0 {
+		err = streamWriter.SetRow("A1", m.SheetDatas[obi].Header)
+		if err != nil || len(m.SheetDatas[obi].Header) == 0 {
 			err = errors.WithMessagef(err, "创建表头错误")
 			return
 		}
 
 		i := 2
-		for _, d := range m.ObjDatas[obi].Data {
+		for _, d := range m.SheetDatas[obi].Data {
 			ref := reflect.ValueOf(d).Elem()
 			var dt []interface{}
 			for k := 0; k < numField; k++ {
