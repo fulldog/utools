@@ -87,7 +87,7 @@ func (dt *DonetTime) UnmarshalJSON(data []byte) error {
 		return errors.New("时间格式错误" + s)
 	}
 	// 将时间戳转换为 time.Time 对象
-	*dt = DonetTime(time.Unix(timestamp/1000, 0).In(timex.TimeZone))
+	*dt = DonetTime(time.Unix(timestamp/1000, 0).In(time.Local))
 	return nil
 }
 func (dt *DonetTime) ToTime() time.Time {
@@ -103,7 +103,7 @@ func (dt *UnixTime) UnmarshalJSON(data []byte) error {
 		return errors.New("时间格式错误" + string(data))
 	}
 	// 将时间戳转换为 time.Time 对象
-	dt.Time = time.Unix(timestamp, 0).In(timex.TimeZone)
+	dt.Time = time.Unix(timestamp, 0).In(time.Local)
 	return nil
 }
 func (dt *UnixTime) ToTime() time.Time {

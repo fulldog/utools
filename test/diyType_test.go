@@ -3,6 +3,7 @@ package test
 import (
 	"fmt"
 	"github.com/fulldog/utools/diyTypes"
+	_ "github.com/fulldog/utools/pools"
 	"github.com/fulldog/utools/timex"
 	jsoniter "github.com/json-iterator/go"
 	"testing"
