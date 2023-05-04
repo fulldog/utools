@@ -1,17 +1,17 @@
 package pools
 
 import (
+	"bufio"
 	"bytes"
-	"crypto/tls"
+	"fmt"
 	"github.com/go-resty/resty/v2"
 	jsoniter "github.com/json-iterator/go"
-	"go.mercari.io/go-dnscache"
-	"go.uber.org/zap"
+	utls "github.com/refraction-networking/utls"
 	"golang.org/x/net/http2"
-	"log"
-	"math/rand"
+	"net"
 	"net/http"
 	"sync"
+
 	"time"
 )
 
@@ -20,43 +20,15 @@ var bufferPool *sync.Pool
 var httpClient *http.Client
 
 func init() {
-	resolver, _ := dnscache.New(5*time.Second, 10*time.Second, zap.NewNop())
-	rand.Seed(time.Now().UTC().UnixNano()) // You MUST run in once in your application
-	transport, err := http2.ConfigureTransports(&http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		//DialContext: (&net.Dialer{
-		//	Timeout:   30 * time.Second,
-		//	KeepAlive: 30 * time.Second,
-		//}).DialContext,
-		//https://pkg.go.dev/go.mercari.io/go-dnscache
-		DialContext:       dnscache.DialFunc(resolver, nil),
-		ForceAttemptHTTP2: true,
-		TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
-		//IdleConnTimeout:       90 * time.Second,
-		//TLSHandshakeTimeout:   5 * time.Second,
-		//ExpectContinueTimeout: 1 * time.Second,
-		//https://xujiahua.github.io/posts/20200723-golang-http-reuse/
-		//MaxIdleConnsPerHost: 100,
-		//MaxConnsPerHost:     300,
-		//MaxIdleConns:        150,
-		//TLSClientConfig: &tls.Config{
-		//	CipherSuites: append(defaultCipherSuites[8:], defaultCipherSuites[:8]...),
-		//},
-		//https://www.imwzk.com/posts/2021-03-14-why-i-always-get-503-with-golang/
-		//defaultCipherSuites := []uint16{0xc02f, 0xc030, 0xc02b, 0xc02c, 0xcca8, 0xcca9, 0xc013, 0xc009, 0xc014, 0xc00a, 0x009c, 0x009d, 0x002f, 0x0035, 0xc012, 0x000a}
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	httpClient = &http.Client{
-		Transport: transport,
-	}
 	bufferPool = &sync.Pool{
 		New: func() interface{} {
 			return bytes.NewBuffer(make([]byte, 0, 4096))
 		},
 	}
-
+	httpClient = &http.Client{
+		Timeout:   time.Second * 10,
+		Transport: NewBypassJA3Transport(utls.HelloChrome_102),
+	}
 	httpPool = &sync.Pool{
 		New: func() interface{} {
 			client := resty.NewWithClient(httpClient)
@@ -86,4 +58,87 @@ func HttpPoolsPut(c *resty.Client) {
 	c.SetDebug(false)
 	c.DisableTrace()
 	httpPool.Put(c)
+}
+func NewBypassJA3Transport(helloID utls.ClientHelloID) *BypassJA3Transport {
+	return &BypassJA3Transport{clientHello: helloID}
+}
+
+type BypassJA3Transport struct {
+	tr1 http.Transport
+	tr2 http2.Transport
+
+	mu          sync.RWMutex
+	clientHello utls.ClientHelloID
+}
+
+func (b *BypassJA3Transport) RoundTrip(req *http.Request) (*http.Response, error) {
+	switch req.URL.Scheme {
+	case "https":
+		return b.httpsRoundTrip(req)
+	case "http":
+		return b.tr1.RoundTrip(req)
+	default:
+		return nil, fmt.Errorf("unsupported scheme: %s", req.URL.Scheme)
+	}
+}
+
+func (b *BypassJA3Transport) httpsRoundTrip(req *http.Request) (*http.Response, error) {
+	port := req.URL.Port()
+	if port == "" {
+		port = "443"
+	}
+
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", req.URL.Host, port))
+	if err != nil {
+		return nil, fmt.Errorf("tcp net dial fail: %w", err)
+	}
+	defer conn.Close() // nolint
+
+	tlsConn, err := b.tlsConnect(conn, req)
+	if err != nil {
+		return nil, fmt.Errorf("tls connect fail: %w", err)
+	}
+
+	httpVersion := tlsConn.ConnectionState().NegotiatedProtocol
+	switch httpVersion {
+	case "h2":
+		conn, err := b.tr2.NewClientConn(tlsConn)
+		if err != nil {
+			return nil, fmt.Errorf("create http2 client with connection fail: %w", err)
+		}
+		defer conn.Close() // nolint
+		return conn.RoundTrip(req)
+	case "http/1.1", "":
+		err := req.Write(tlsConn)
+		if err != nil {
+			return nil, fmt.Errorf("write http1 tls connection fail: %w", err)
+		}
+		return http.ReadResponse(bufio.NewReader(tlsConn), req)
+	default:
+		return nil, fmt.Errorf("unsuported http version: %s", httpVersion)
+	}
+}
+
+func (b *BypassJA3Transport) getTLSConfig(req *http.Request) *utls.Config {
+	return &utls.Config{
+		ServerName:         req.URL.Host,
+		InsecureSkipVerify: true,
+	}
+}
+
+func (b *BypassJA3Transport) tlsConnect(conn net.Conn, req *http.Request) (*utls.UConn, error) {
+	b.mu.RLock()
+	tlsConn := utls.UClient(conn, b.getTLSConfig(req), b.clientHello)
+	b.mu.RUnlock()
+
+	if err := tlsConn.Handshake(); err != nil {
+		return nil, fmt.Errorf("tls handshake fail: %w", err)
+	}
+	return tlsConn, nil
+}
+
+func (b *BypassJA3Transport) SetClientHello(hello utls.ClientHelloID) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.clientHello = hello
 }

@@ -5,10 +5,10 @@ import (
 	"crypto/aes"
 	"fmt"
 	"github.com/foursking/bstring"
-	"github.com/fulldog/utools/ecb"
 	"github.com/thinkeridea/go-extend/exstrings"
 )
 
+// PriceEncode 价格加密
 func PriceEncode(price string, token string, key string, bidid string) string {
 	price = fmt.Sprintf("%-8s", price)
 	iv := bidid[len(bidid)-16:]
@@ -28,16 +28,17 @@ func PriceDecode(b64 string, token string) string {
 	return StrByXOR(str[16:len(str)-4], HmacSha1(str[:16], token)[:8])
 }
 
+// AESEncrypt xx
 func AESEncrypt(src, key []byte) []byte {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil
 	}
-	ecb := ecb.NewECBEncrypter(block)
+	ecbx := NewECBEncrypted(block)
 	content := []byte(src)
 	content = PKCS5Padding(content, block.BlockSize())
 	des := make([]byte, len(content))
-	ecb.CryptBlocks(des, content)
+	ecbx.CryptBlocks(des, content)
 	return des
 }
 
@@ -47,7 +48,7 @@ func AesDecrypt(crypted, key []byte) []byte {
 	if err != nil {
 		return nil
 	}
-	blockMode := ecb.NewECBDecrypter(block)
+	blockMode := NewECBDecrypted(block)
 	origData := make([]byte, len(crypted))
 	blockMode.CryptBlocks(origData, crypted)
 	origData = PKCS5UnPadding(origData)
