@@ -30,11 +30,10 @@ func EnumIntGetDesc(p interface{}, k int) string {
 }
 
 func EnumIntGetDescDefault(p interface{}, k int, def string) string {
-	r := EnumIntGetDesc(p, k)
-	if r == "" {
-		return def
+	if r := EnumIntGetDesc(p, k); r != "" {
+		return r
 	}
-	return r
+	return def
 }
 func GetEnumKeyByValue(enum interface{}, v interface{}, k string) (s string) {
 	rvf := reflect.ValueOf(enum)

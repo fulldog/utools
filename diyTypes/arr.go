@@ -1,10 +1,6 @@
 package diyTypes
 
-import (
-	"github.com/pkg/errors"
-)
-
-var errNotFound error = errors.New("not found")
+import jsoniter "github.com/json-iterator/go"
 
 // DistinctList 非并发安全
 type DistinctList[T comparable] struct {
@@ -33,14 +29,13 @@ func (lst DiyListAny[T]) SumInt(fn func(x T) int) (f int) {
 }
 
 // FindOne 查询一个
-func (lst DiyListAny[T]) FindOne(fn func(x T) bool) (xy T, err error) {
+func (lst DiyListAny[T]) FindOne(fn func(x T) bool) (xy *T) {
 	for i := 0; i < len(lst); i++ {
 		if fn(lst[i]) {
-			xy = lst[i]
+			xy = &lst[i]
 			return
 		}
 	}
-	err = errNotFound
 	return
 }
 
@@ -66,7 +61,7 @@ func (lst DiyListAny[T]) HasOne(fn func(x T) bool) bool {
 
 // FindList 返回查询的集合
 func (lst DiyListAny[T]) FindList(fn func(x T) bool) []T {
-	var rt = make([]T, len(lst))
+	var rt = make([]T, 0, len(lst))
 	for i := 0; i < len(lst); i++ {
 		if fn(lst[i]) {
 			rt = append(rt, lst[i])
@@ -77,7 +72,7 @@ func (lst DiyListAny[T]) FindList(fn func(x T) bool) []T {
 
 // DistinctListString 请使用可比较类型
 func (lst DiyListAny[T]) DistinctListString(fn func(x T) string) []T {
-	var rt = make([]T, len(lst))
+	var rt = make([]T, 0, len(lst))
 	var filter = make(map[string]struct{}, len(lst))
 	for i := 0; i < len(lst); i++ {
 		s := fn(lst[i])
@@ -90,7 +85,7 @@ func (lst DiyListAny[T]) DistinctListString(fn func(x T) string) []T {
 }
 
 func (lst DiyListAny[T]) DistinctListInt(fn func(x T) int) []T {
-	var rt = make([]T, len(lst))
+	var rt = make([]T, 0, len(lst))
 	var filter = make(map[int]struct{}, len(lst))
 	for i := 0; i < len(lst); i++ {
 		s := fn(lst[i])
@@ -139,7 +134,7 @@ func (l *DistinctList[T]) distinct(x T) {
 	}
 	l.distinctMap[x] = struct{}{}
 }
-func (l *DistinctList[T]) Adds(x []T) *DistinctList[T] {
+func (l *DistinctList[T]) Adds(x ...T) *DistinctList[T] {
 	for _, t := range x {
 		l.Add(t)
 	}
@@ -172,12 +167,15 @@ func (l *DistinctList[T]) Distinct() []T {
 func (l *DistinctList[T]) ReValue(x []T) *DistinctList[T] {
 	l.arr = nil
 	l.distinctMap = nil
-	l.Adds(x)
+	l.Adds(x...)
 	return l
 }
 
 // Except 排除arr元素
-func (l *DistinctList[T]) Except(arr []T) *DistinctList[T] {
+func (l *DistinctList[T]) Except(arr ...T) *DistinctList[T] {
+	if l.distinctMap == nil {
+		l.distinctMap = make(map[T]struct{}, 10)
+	}
 	for _, t := range arr {
 		if _, ok := l.distinctMap[t]; ok {
 			delete(l.distinctMap, t)
@@ -192,4 +190,23 @@ func (l *DistinctList[T]) Except(arr []T) *DistinctList[T] {
 
 func (l *DistinctList[T]) ToList() []T {
 	return l.arr
+}
+
+func (l *DistinctList[T]) UnmarshalJSON(data []byte) error {
+	var arr []T
+	err := jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal(data, &arr)
+	if err != nil {
+		return err
+	}
+	l.Adds(arr...)
+	return nil
+}
+
+func (l *DistinctList[T]) ToJsonString(unique bool) (s string) {
+	if unique {
+		s, _ = jsoniter.ConfigCompatibleWithStandardLibrary.MarshalToString(l.Distinct())
+	} else {
+		s, _ = jsoniter.ConfigCompatibleWithStandardLibrary.MarshalToString(l.arr)
+	}
+	return
 }

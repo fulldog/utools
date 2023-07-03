@@ -47,15 +47,14 @@ func ArrayKeys[T comparable](m map[T]any) []T {
 	return arr
 }
 
-func ArraySlice[T any](slic []T, str int, end int) []T {
-	le := len(slic)
-	if end > le {
-		end = le
+func ArraySlice[T any](arr []T, str int, end int) []T {
+	if end > len(arr) {
+		end = len(arr)
 	}
 	if str < 0 {
 		str = 0
 	}
-	return slic[str:end]
+	return arr[str:end]
 }
 
 func InArray[T comparable](t []T, check T) bool {
