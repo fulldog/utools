@@ -2,13 +2,6 @@ package diyTypes
 
 import jsoniter "github.com/json-iterator/go"
 
-// DistinctList 非并发安全
-type DistinctList[T comparable] struct {
-	arr         []T
-	arrDist     []T
-	distinctMap map[T]struct{}
-}
-
 // DiyListAny 任意类型的list
 type DiyListAny[T any] []T
 
@@ -128,6 +121,13 @@ func (lst DiyListAny[T]) Slice(st, et uint) []T {
 	return lst[st:et]
 }
 
+// DistinctList 非并发安全
+type DistinctList[T comparable] struct {
+	arr         []T
+	arrDist     []T
+	distinctMap map[T]struct{}
+}
+
 func (l *DistinctList[T]) distinct(x T) {
 	if l.distinctMap == nil {
 		l.distinctMap = make(map[T]struct{}, 10)
@@ -164,7 +164,7 @@ func (l *DistinctList[T]) Distinct() []T {
 	return nil
 }
 
-func (l *DistinctList[T]) ReValue(x []T) *DistinctList[T] {
+func (l *DistinctList[T]) ReValue(x ...T) *DistinctList[T] {
 	l.arr = nil
 	l.distinctMap = nil
 	l.Adds(x...)
@@ -202,11 +202,11 @@ func (l *DistinctList[T]) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (l *DistinctList[T]) ToJsonString(unique bool) (s string) {
+func (l *DistinctList[T]) ToJsonString(unique bool) (s string, err error) {
 	if unique {
-		s, _ = jsoniter.ConfigCompatibleWithStandardLibrary.MarshalToString(l.Distinct())
+		s, err = jsoniter.ConfigCompatibleWithStandardLibrary.MarshalToString(l.Distinct())
 	} else {
-		s, _ = jsoniter.ConfigCompatibleWithStandardLibrary.MarshalToString(l.arr)
+		s, err = jsoniter.ConfigCompatibleWithStandardLibrary.MarshalToString(l.arr)
 	}
 	return
 }
