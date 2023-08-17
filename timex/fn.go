@@ -5,7 +5,12 @@ import (
 )
 
 // CompareTime 比较时间大小
-func CompareTime(t1, t2 time.Time, cond string) bool {
+// @timeZone bool 是否需要统一时区
+// @return    bool
+func CompareTime(t1, t2 time.Time, cond string, timeZone bool) bool {
+	if timeZone {
+		t2 = time.Date(t2.Year(), t2.Month(), t2.Day(), t2.Hour(), t2.Minute(), t2.Second(), t2.Nanosecond(), t1.Location())
+	}
 	switch cond {
 	case ">":
 		return t1.After(t2)
