@@ -6,7 +6,6 @@ import (
 	"github.com/go-playground/locales/en"
 	"github.com/go-playground/locales/zh_Hans"
 	ut "github.com/go-playground/universal-translator"
-	"github.com/go-playground/validator/v10"
 	en_translations "github.com/go-playground/validator/v10/translations/en"
 	zh_translations "github.com/go-playground/validator/v10/translations/zh"
 	"log"
@@ -18,6 +17,9 @@ import (
 type DiyValidatorInf interface {
 	DiyValidator() error
 }
+type Validatorx interface {
+	Validate(ctx context.Context, data interface{}, lang string) error
+}
 
 var validatorxErr = "validatorxErr"
 
@@ -27,12 +29,12 @@ type validatorx struct {
 	Trans     map[string]ut.Translator
 }
 
-var v *validatorx
+var v validatorx
 var once sync.Once
 
-func NewValidator() *validatorx {
+func NewValidator() Validatorx {
 	once.Do(func() {
-		v = &validatorx{}
+		v = validatorx{}
 		enx := en.New()
 		zh := zh_Hans.New()
 		v.Uni = ut.New(zh, enx, zh)
@@ -89,7 +91,7 @@ func (v *validatorx) validate(ctx context.Context, data interface{}, lang string
 
 var infRtf = reflect.TypeOf((*DiyValidatorInf)(nil)).Elem()
 
-func (v *validatorx) Validate(ctx context.Context, data interface{}, lang string) error {
+func (v validatorx) Validate(ctx context.Context, data interface{}, lang string) error {
 	//先调用接口验证参数
 	rvf := reflect.Indirect(reflect.ValueOf(data))
 	rtf := rvf.Type()
