@@ -4,6 +4,16 @@ import (
 	"time"
 )
 
+var TimeZone, _ = time.LoadLocation("Asia/Shanghai")
+var TimeEnd59 = 86399 * time.Second
+
+func init() {
+	time.Local = TimeZone
+}
+func SetTimeZone(tz *time.Location) {
+	TimeZone = tz
+}
+
 // CompareTime 比较时间大小
 // @timeZone bool 是否需要统一时区
 // @return    bool
@@ -94,4 +104,22 @@ func NewTicket(fn func(), t *time.Ticker) {
 		fn()
 		<-t.C
 	}
+}
+func Parse(tm string) time.Time {
+	if tm == "" {
+		return time.Time{}
+	}
+	t, err := time.ParseInLocation(DateOnly, tm, TimeZone)
+	if err == nil {
+		return t
+	}
+	t, err = time.ParseInLocation(DateTime, tm, TimeZone)
+	if err == nil {
+		return t
+	}
+	return time.Time{}
+}
+
+func Between(start, end, current time.Time, tz bool) bool {
+	return CompareTime(start, current, "<=", tz) && CompareTime(end, current, ">=", tz)
 }
